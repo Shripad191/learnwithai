@@ -1,43 +1,98 @@
-# SeekhoWithAI 🚀
+# LearnWithAI
 
-An AI-powered educational platform that helps teachers (Class 1-8) create comprehensive teaching materials including summaries, mind maps, quizzes, lesson plans, SEL/STEM activities, and interactive presentations using Google Gemini AI.
+A modern, AI-powered lesson planning and educational content platform built with Next.js, TypeScript, and Tailwind CSS. This project enables educators to generate, manage, and present lesson plans, quizzes, mind maps, and presentations with seamless integration of AI and cloud storage.
 
-## ✨ Features
+## Features
 
-### 🎯 Multiple AI-Powered Tools
+- AI-driven lesson plan generation
+- Quiz and mind map creation
+- Presentation viewer and export tools
+- User authentication and protected routes
+- Supabase and Firebase integration for storage and database
+- Modular component architecture
+- Responsive UI with Tailwind CSS and shadcn/ui
 
-- **📝 Summary Generator**: Transform chapter content into clear, structured summaries with hierarchical organization
-- **🧠 Mind Map Generator**: Create interactive, visual mind maps with expand/collapse functionality
-- **📋 Quiz Generator**: Generate engaging quizzes with multiple question types (MCQ, True/False, Fill-in-the-blanks, Short Answer)
-- **📅 Lesson Planner**: Create detailed, time-optimized lesson plans with NEP 2020 alignment
-- **🎨 SEL/STEM Activities**: Generate creative, hands-on activities for solo, pair, or group work
-- **🎤 Presentation Generator**: Create PowerPoint-style lecture presentations with slides
+## Tech Stack
 
-### 🎓 Smart Features
+- **Frontend:** Next.js, React, TypeScript, Tailwind CSS, shadcn/ui
+- **Backend:** Supabase, Firebase
+- **AI Integration:** Gemini, OpenRouter
+- **Storage:** Supabase Storage, Firebase
 
-- **🔐 User Authentication**: Secure login with Email/Password and Google OAuth via Supabase
-- **☁️ Cloud Storage**: Save and sync your content across devices with Supabase database
-- **📊 Data Migration**: Seamlessly migrate from localStorage to cloud storage
-- **Class-Based Adaptation**: Automatically adjusts content complexity for Class 1-8
-- **Board Support**: CBSE, ICSE, State Board, IB, IGCSE compatibility
-- **Subject Flexibility**: Works with any subject (Math, Science, English, Social Studies, etc.)
-- **Save & Load**: Save your generated content to the cloud and access it anywhere
-- **Export Options**: Export quizzes, lesson plans, and presentations in various formats
-- **Premium UI**: Modern, responsive design with stunning animations and glassmorphism effects
-
-## 🚀 Getting Started
+## Getting Started
 
 ### Prerequisites
+- Node.js (v18+ recommended)
+- npm or yarn
+- Supabase and Firebase accounts
 
-- Node.js 18+ installed
-- A Gemini API key from [Google AI Studio](https://aistudio.google.com/app/apikey)
-- A Supabase account (free tier available at [supabase.com](https://supabase.com))
+### Installation
 
-### Quick Installation
-
-1. **Clone the repository**:
+1. Clone the repository:
    ```bash
-   git clone https://github.com/Shripad191/learn_with_ai.git
+   git clone https://github.com/Shripad191/learnwithai.git
+   cd learnwithai
+   ```
+2. Install dependencies:
+   ```bash
+   npm install
+   ```
+3. Set up environment variables:
+   - Copy `.env.example` to `.env` and fill in your keys for Supabase, Firebase, and AI providers.
+4. Configure Supabase:
+   - Run SQL scripts in the `supabase/` folder to set up tables, triggers, and RLS.
+5. (Optional) Configure Firebase as per `FIREBASE_SETUP.md`.
+
+### Running the App
+
+```bash
+npm run dev
+```
+
+The app will be available at `http://localhost:3000`.
+
+## Project Structure
+
+- `app/` - Next.js app directory (pages, layouts, API routes)
+- `components/` - UI and functional React components
+- `contexts/` - React context providers (e.g., Auth)
+- `hooks/` - Custom React hooks
+- `lib/` - Utility libraries and AI integration
+- `supabase/` - SQL setup scripts
+- `types/` - TypeScript type definitions
+
+## Usage
+
+- Generate lesson plans, quizzes, and mind maps using AI
+- Export content as presentations or PDFs
+- Manage and view lesson plans securely
+
+## Contributing
+
+Contributions are welcome! Please open issues or submit pull requests for improvements or bug fixes.
+
+## License
+
+This project is licensed under the MIT License.
+
+## Acknowledgements
+
+- [Next.js](https://nextjs.org/)
+- [Supabase](https://supabase.com/)
+- [Firebase](https://firebase.google.com/)
+- [shadcn/ui](https://ui.shadcn.com/)
+- [Tailwind CSS](https://tailwindcss.com/)
+- [Gemini](https://ai.google.dev/gemini)
+- [OpenRouter](https://openrouter.ai/)
+
+---
+
+For setup guides, see:
+- `DATABASE_SETUP.md`
+- `FIREBASE_SETUP.md`
+- `SUPABASE_SETUP.md`
+- `SHADCN_MIGRATION_GUIDE.md`
+- `QUICK_START.md`
    cd learn_with_ai
    ```
 
@@ -420,5 +475,4 @@ For issues, questions, or feature requests:
 ---
 
 **Made with ❤️ for educators and students | Empowering teachers with AI**
-#   l e a r n w i t h a i  
- 
+#

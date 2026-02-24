@@ -6,8 +6,8 @@ import type {
   SubTopic,
   KeyPoint
 } from "@/types";
-import { generateNodeId } from "./utils";
 import { GoogleGenerativeAI } from "@google/generative-ai";
+import { callOpenRouter, isOpenRouterConfigured } from "./openrouter";
 
 /**
  * Get Gemini client with API key
@@ -41,10 +41,7 @@ function getGeminiClient(feature?: 'summary' | 'mindmap' | 'quiz'): GoogleGenera
  * Detect the language of the input text
  */
 async function detectLanguage(text: string): Promise<string> {
-  const genAI = getGeminiClient();
-
-  try {
-    const prompt = `Detect the primary language of this text. Respond with ONLY the language name.
+  const prompt = `Detect the primary language of this text. Respond with ONLY the language name.
 Examples: English, Hindi, Marathi, Sanskrit, Tamil, Telugu, Gujarati, Bengali
 
 Text:
@@ -52,13 +49,28 @@ ${text.substring(0, 500)}
 
 Language:`;
 
+  try {
+    const genAI = getGeminiClient();
     const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
     const result = await model.generateContent(prompt);
     const language = result.response.text().trim();
-    console.log("🌐 Detected language:", language);
+    console.log("🌐 Detected language (via Gemini):", language);
     return language;
   } catch (error) {
-    console.error("Language detection error:", error);
+    console.warn("Gemini language detection failed, trying OpenRouter fallback:", error);
+
+    if (isOpenRouterConfigured()) {
+      try {
+        const response = await callOpenRouter(prompt);
+        const language = response.trim();
+        console.log("🌐 Detected language (via OpenRouter):", language);
+        return language;
+      } catch (fallbackError) {
+        console.error("OpenRouter language detection also failed:", fallbackError);
+      }
+    }
+
+    console.log("🌐 Defaulting to English");
     return "English";
   }
 }
@@ -214,20 +226,50 @@ ${chapterText}
 
 🚨 FINAL REMINDER: Generate summary in ${detectedLanguage.toUpperCase()} ONLY!`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+      const result = await model.generateContent(prompt);
+      const response = result.response.text();
 
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonText = response.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
+      // Extract JSON from response (handle markdown code blocks)
+      let jsonText = response.trim();
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/```\n?/g, '');
+      }
+
+      const summary: SummaryStructure = JSON.parse(jsonText);
+      console.log("✅ Summary generated via Gemini");
+      return summary;
+    } catch (geminiError) {
+      console.warn("Gemini summary generation failed, trying OpenRouter fallback:", geminiError);
+
+      if (!isOpenRouterConfigured()) {
+        throw geminiError;
+      }
+
+      try {
+        const response = await callOpenRouter(prompt);
+
+        // Extract JSON from response (handle markdown code blocks)
+        let jsonText = response.trim();
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.replace(/```\n?/g, '');
+        }
+
+        const summary: SummaryStructure = JSON.parse(jsonText);
+        console.log("✅ Summary generated via OpenRouter");
+        return summary;
+      } catch (fallbackError) {
+        console.error("Both Gemini and OpenRouter failed for summary generation");
+        throw new Error(
+          `Failed to generate summary with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+        );
+      }
     }
-
-    const summary: SummaryStructure = JSON.parse(jsonText);
-    return summary;
   } catch (error) {
     console.error("Error generating summary:", error);
     throw new Error(
@@ -346,20 +388,50 @@ ${summaryJson}
 
 🚨 FINAL REMINDER: All "topic" fields MUST be in ${summaryLanguage.toUpperCase()} ONLY!`;
 
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(prompt);
-    const response = result.response.text();
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+      const result = await model.generateContent(prompt);
+      const response = result.response.text();
 
-    // Extract JSON from response
-    let jsonText = response.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
+      // Extract JSON from response
+      let jsonText = response.trim();
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/```\n?/g, '');
+      }
+
+      const mindMapData: JsMindData = JSON.parse(jsonText);
+      console.log("✅ Mind map generated via Gemini");
+      return mindMapData;
+    } catch (geminiError) {
+      console.warn("Gemini mind map generation failed, trying OpenRouter fallback:", geminiError);
+
+      if (!isOpenRouterConfigured()) {
+        throw geminiError;
+      }
+
+      try {
+        const response = await callOpenRouter(prompt);
+
+        // Extract JSON from response
+        let jsonText = response.trim();
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.replace(/```\n?/g, '');
+        }
+
+        const mindMapData: JsMindData = JSON.parse(jsonText);
+        console.log("✅ Mind map generated via OpenRouter");
+        return mindMapData;
+      } catch (fallbackError) {
+        console.error("Both Gemini and OpenRouter failed for mind map generation");
+        throw new Error(
+          `Failed to generate mind map with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+        );
+      }
     }
-
-    const mindMapData: JsMindData = JSON.parse(jsonText);
-    return mindMapData;
   } catch (error) {
     console.error("Error generating mind map:", error);
     throw new Error(

@@ -27,9 +27,9 @@ export default function ClassSelector({
                     disabled={disabled}
                     className={cn(
                         "w-full px-4 py-3 pr-10 rounded-lg font-medium text-base",
-                        "border-2 border-gray-300 bg-gradient-to-r from-blue-50 to-purple-50 text-gray-800",
-                        "focus:outline-none focus:ring-2 focus:ring-primary-500 focus:border-transparent",
-                        "hover:border-primary-400 hover:shadow-md transition-all duration-200",
+                        "border-2 border-gray-300 bg-white text-gray-900",
+                        "focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent",
+                        "hover:border-gray-400 hover:shadow-md transition-all duration-200",
                         "disabled:opacity-50 disabled:cursor-not-allowed",
                         "cursor-pointer appearance-none"
                     )}
@@ -43,15 +43,11 @@ export default function ClassSelector({
 
                 {/* Custom Arrow */}
                 <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                    <svg className="w-5 h-5 text-primary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                     </svg>
                 </div>
             </div>
-            <p className="mt-2 text-xs text-gray-600">
-                <span className="font-semibold">Class {selectedClass}:</span>{' '}
-                {getComplexityDescription(selectedClass)}
-            </p>
         </div>
     );
 }

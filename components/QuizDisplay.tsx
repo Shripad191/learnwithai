@@ -1,16 +1,43 @@
 "use client";
 
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
+import dynamic from 'next/dynamic';
 import type { Quiz, QuizQuestion } from '@/types';
+import type { OutputData } from '@editorjs/editorjs';
 import { cn } from '@/lib/utils';
+import { quizToEditorJS } from '@/lib/editorjs-converters';
+
+const Editor = dynamic(() => import('@/components/Editor'), {
+    loading: () => <div className="animate-pulse bg-gray-100 rounded-xl h-64 flex items-center justify-center"><p className="text-gray-500">Loading editor...</p></div>,
+    ssr: false
+});
 
 interface QuizDisplayProps {
     quiz: Quiz;
+    onEditorDataChange?: (data: OutputData) => void;
 }
 
-export default function QuizDisplay({ quiz }: QuizDisplayProps) {
+export default function QuizDisplay({ quiz, onEditorDataChange }: QuizDisplayProps) {
     const [activeTab, setActiveTab] = useState<'all' | 'mcq' | 'tf' | 'sa'>('all');
     const [showAnswers, setShowAnswers] = useState(false);
+    const [isEditMode, setIsEditMode] = useState(false);
+    const [editorData, setEditorData] = useState<OutputData | null>(null);
+
+    // Convert quiz to Editor.js format (memoized)
+    const initialEditorData = useMemo(() => {
+        return quizToEditorJS(quiz);
+    }, [quiz]);
+
+    const handleEditorChange = (data: OutputData) => {
+        setEditorData(data);
+        if (onEditorDataChange) {
+            onEditorDataChange(data);
+        }
+    };
+
+    const toggleEditMode = () => {
+        setIsEditMode(!isEditMode);
+    };
 
     const mcqQuestions = quiz.questions.filter(q => q.type === 'multiple-choice');
     const tfQuestions = quiz.questions.filter(q => q.type === 'true-false');
@@ -126,78 +153,106 @@ export default function QuizDisplay({ quiz }: QuizDisplayProps) {
 
     return (
         <div className="w-full bg-white rounded-xl shadow-lg border border-gray-200 overflow-hidden">
-            {/* Header */}
-            <div className="bg-gradient-to-r from-secondary-500 to-secondary-600 px-6 py-4">
-                <div className="flex items-center justify-between flex-wrap gap-3">
-                    <div>
-                        <h3 className="text-xl font-bold text-white">📝 Quiz Questions</h3>
-                        <p className="text-secondary-100 text-sm">
-                            {quiz.questions.length} questions • Class {quiz.classLevel}
-                        </p>
-                    </div>
+            {/* Edit Button - Always visible */}
+            <div className="bg-white border-b border-gray-200 px-6 py-3 flex items-center justify-between">
+                <button
+                    onClick={toggleEditMode}
+                    className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
+                >
+                    {isEditMode ? '👁️ View' : '✏️ Edit'}
+                </button>
+                {!isEditMode && (
                     <button
                         onClick={() => setShowAnswers(!showAnswers)}
-                        className="px-4 py-2 bg-white/20 hover:bg-white/30 text-white rounded-lg text-sm font-medium transition-colors backdrop-blur-sm"
+                        className="px-4 py-2 bg-secondary-500 hover:bg-secondary-600 text-white rounded-lg text-sm font-medium transition-colors shadow-sm"
                     >
                         {showAnswers ? '🙈 Hide Answers' : '👁️ Show Answers'}
                     </button>
-                </div>
+                )}
             </div>
 
-            {/* Tabs */}
-            <div className="border-b border-gray-200 bg-gray-50 px-6">
-                <div className="flex gap-2 overflow-x-auto">
-                    <button
-                        onClick={() => setActiveTab('all')}
-                        className={cn(
-                            "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === 'all'
-                                ? "border-secondary-500 text-secondary-700"
-                                : "border-transparent text-gray-600 hover:text-gray-800"
-                        )}
-                    >
-                        All ({quiz.questions.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('mcq')}
-                        className={cn(
-                            "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === 'mcq'
-                                ? "border-blue-500 text-blue-700"
-                                : "border-transparent text-gray-600 hover:text-gray-800"
-                        )}
-                    >
-                        MCQ ({mcqQuestions.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('tf')}
-                        className={cn(
-                            "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === 'tf'
-                                ? "border-green-500 text-green-700"
-                                : "border-transparent text-gray-600 hover:text-gray-800"
-                        )}
-                    >
-                        True/False ({tfQuestions.length})
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('sa')}
-                        className={cn(
-                            "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
-                            activeTab === 'sa'
-                                ? "border-purple-500 text-purple-700"
-                                : "border-transparent text-gray-600 hover:text-gray-800"
-                        )}
-                    >
-                        Short Answer ({saQuestions.length})
-                    </button>
+            {/* Header - Hidden in edit mode since content is editable in editor */}
+            {!isEditMode && (
+                <div className="bg-gradient-to-r from-secondary-500 to-secondary-600 px-6 py-4">
+                    <div className="flex items-center justify-between flex-wrap gap-3">
+                        <div>
+                            <h3 className="text-xl font-bold text-white">📝 Quiz Questions</h3>
+                            <p className="text-secondary-100 text-sm">
+                                {quiz.questions.length} questions • Class {quiz.classLevel}
+                            </p>
+                        </div>
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* Questions */}
-            <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto">
-                {getFilteredQuestions().map((question, index) => renderQuestion(question, index))}
-            </div>
+            {/* Content: Either Editor or Tabs+Questions */}
+            {isEditMode ? (
+                <div className="p-6">
+                    <Editor
+                        initialData={editorData || initialEditorData}
+                        onChange={handleEditorChange}
+                        placeholder="Edit your quiz..."
+                        minHeight={500}
+                    />
+                </div>
+            ) : (
+                <>
+                    {/* Tabs */}
+                    <div className="border-b border-gray-200 bg-gray-50 px-6">
+                        <div className="flex gap-2 overflow-x-auto">
+                            <button
+                                onClick={() => setActiveTab('all')}
+                                className={cn(
+                                    "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === 'all'
+                                        ? "border-secondary-500 text-secondary-700"
+                                        : "border-transparent text-gray-600 hover:text-gray-800"
+                                )}
+                            >
+                                All ({quiz.questions.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('mcq')}
+                                className={cn(
+                                    "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === 'mcq'
+                                        ? "border-blue-500 text-blue-700"
+                                        : "border-transparent text-gray-600 hover:text-gray-800"
+                                )}
+                            >
+                                MCQ ({mcqQuestions.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('tf')}
+                                className={cn(
+                                    "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === 'tf'
+                                        ? "border-green-500 text-green-700"
+                                        : "border-transparent text-gray-600 hover:text-gray-800"
+                                )}
+                            >
+                                True/False ({tfQuestions.length})
+                            </button>
+                            <button
+                                onClick={() => setActiveTab('sa')}
+                                className={cn(
+                                    "px-4 py-3 font-medium text-sm border-b-2 transition-colors whitespace-nowrap",
+                                    activeTab === 'sa'
+                                        ? "border-purple-500 text-purple-700"
+                                        : "border-transparent text-gray-600 hover:text-gray-800"
+                                )}
+                            >
+                                Short Answer ({saQuestions.length})
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Questions */}
+                    <div className="p-6 space-y-4 max-h-[600px] overflow-y-auto">
+                        {getFilteredQuestions().map((question, index) => renderQuestion(question, index))}
+                    </div>
+                </>
+            )}
         </div>
     );
 }

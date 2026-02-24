@@ -25,11 +25,11 @@ export default function BoardSelector({ value, onChange, disabled = false }: Boa
             onChange={(e) => onChange(e.target.value as Board)}
             disabled={disabled}
             className="w-full px-4 py-3 bg-white border-2 border-gray-300 rounded-lg shadow-sm
-                     focus:border-primary-500 focus:ring-2 focus:ring-primary-200 
+                     focus:border-gray-400 focus:ring-2 focus:ring-gray-400 
                      disabled:bg-gray-100 disabled:cursor-not-allowed
                      transition-all duration-200 cursor-pointer
-                     text-gray-800 font-medium
-                     hover:border-primary-400"
+                     text-gray-900 font-medium
+                     hover:border-gray-400"
         >
             <option value="">Select Board</option>
             {boards.map((board) => (

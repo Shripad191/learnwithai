@@ -1,5 +1,6 @@
 import type { ClassLevel, SELSTEMActivity, ActivityType } from '@/types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callOpenRouter, isOpenRouterConfigured } from './openrouter';
 
 /**
  * Get Gemini client with API key
@@ -96,53 +97,114 @@ Generate a detailed activity in VALID JSON format (no markdown, just pure JSON):
 
 IMPORTANT: Return ONLY the JSON object, no additional text, no markdown formatting, no code blocks.`;
 
-        console.log('📡 Calling Gemini API...');
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const text = result.response.text();
-        console.log('📝 Raw response received');
+        try {
+            console.log('📡 Calling Gemini API...');
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+            const result = await model.generateContent(prompt);
+            const text = result.response.text();
+            console.log('📝 Raw response received');
 
-        // Clean the response - remove markdown code blocks if present
-        let cleanedText = text.trim();
-        if (cleanedText.startsWith('```json')) {
-            cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
-        } else if (cleanedText.startsWith('```')) {
-            cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+            // Clean the response - remove markdown code blocks if present
+            let cleanedText = text.trim();
+            if (cleanedText.startsWith('```json')) {
+                cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+            } else if (cleanedText.startsWith('```')) {
+                cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+            }
+
+            // Parse JSON response
+            const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+            if (!jsonMatch) {
+                console.error('❌ Failed to find JSON in response:', cleanedText);
+                throw new Error("Failed to parse activity response");
+            }
+
+            console.log('🔍 Parsing JSON...');
+            const parsed = JSON.parse(jsonMatch[0]);
+
+            const activity: SELSTEMActivity = {
+                id: `activity-${Date.now()}`,
+                classLevel,
+                subject,
+                activityType,
+                title: parsed.title || 'Untitled Activity',
+                selFocus: parsed.selFocus || [],
+                realWorldConnection: parsed.realWorldConnection || '',
+                materials: parsed.materials || [],
+                duration: parsed.duration || '30-45 minutes',
+                instructions: {
+                    setup: parsed.instructions?.setup || '',
+                    steps: parsed.instructions?.steps || [],
+                    reflection: parsed.instructions?.reflection || ''
+                },
+                learningObjectives: parsed.learningObjectives || [],
+                assessmentCriteria: parsed.assessmentCriteria || [],
+                extensions: parsed.extensions || [],
+                generatedAt: Date.now()
+            };
+
+            console.log('✅ Activity generated via Gemini:', activity.title);
+            return activity;
+        } catch (geminiError) {
+            console.warn("Gemini activity generation failed, trying OpenRouter fallback:", geminiError);
+
+            if (!isOpenRouterConfigured()) {
+                throw geminiError;
+            }
+
+            try {
+                console.log('📡 Calling OpenRouter API...');
+                const text = await callOpenRouter(prompt);
+                console.log('📝 Raw response received from OpenRouter');
+
+                // Clean the response - remove markdown code blocks if present
+                let cleanedText = text.trim();
+                if (cleanedText.startsWith('```json')) {
+                    cleanedText = cleanedText.replace(/^```json\s*/, '').replace(/\s*```$/, '');
+                } else if (cleanedText.startsWith('```')) {
+                    cleanedText = cleanedText.replace(/^```\s*/, '').replace(/\s*```$/, '');
+                }
+
+                // Parse JSON response
+                const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
+                if (!jsonMatch) {
+                    console.error('❌ Failed to find JSON in response:', cleanedText);
+                    throw new Error("Failed to parse activity response");
+                }
+
+                console.log('🔍 Parsing JSON...');
+                const parsed = JSON.parse(jsonMatch[0]);
+
+                const activity: SELSTEMActivity = {
+                    id: `activity-${Date.now()}`,
+                    classLevel,
+                    subject,
+                    activityType,
+                    title: parsed.title || 'Untitled Activity',
+                    selFocus: parsed.selFocus || [],
+                    realWorldConnection: parsed.realWorldConnection || '',
+                    materials: parsed.materials || [],
+                    duration: parsed.duration || '30-45 minutes',
+                    instructions: {
+                        setup: parsed.instructions?.setup || '',
+                        steps: parsed.instructions?.steps || [],
+                        reflection: parsed.instructions?.reflection || ''
+                    },
+                    learningObjectives: parsed.learningObjectives || [],
+                    assessmentCriteria: parsed.assessmentCriteria || [],
+                    extensions: parsed.extensions || [],
+                    generatedAt: Date.now()
+                };
+
+                console.log('✅ Activity generated via OpenRouter:', activity.title);
+                return activity;
+            } catch (fallbackError) {
+                console.error("Both Gemini and OpenRouter failed for activity generation");
+                throw new Error(
+                    `Failed to generate activity with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+                );
+            }
         }
-
-        // Parse JSON response
-        const jsonMatch = cleanedText.match(/\{[\s\S]*\}/);
-        if (!jsonMatch) {
-            console.error('❌ Failed to find JSON in response:', cleanedText);
-            throw new Error("Failed to parse activity response");
-        }
-
-        console.log('🔍 Parsing JSON...');
-        const parsed = JSON.parse(jsonMatch[0]);
-
-        const activity: SELSTEMActivity = {
-            id: `activity-${Date.now()}`,
-            classLevel,
-            subject,
-            activityType,
-            title: parsed.title || 'Untitled Activity',
-            selFocus: parsed.selFocus || [],
-            realWorldConnection: parsed.realWorldConnection || '',
-            materials: parsed.materials || [],
-            duration: parsed.duration || '30-45 minutes',
-            instructions: {
-                setup: parsed.instructions?.setup || '',
-                steps: parsed.instructions?.steps || [],
-                reflection: parsed.instructions?.reflection || ''
-            },
-            learningObjectives: parsed.learningObjectives || [],
-            assessmentCriteria: parsed.assessmentCriteria || [],
-            extensions: parsed.extensions || [],
-            generatedAt: Date.now()
-        };
-
-        console.log('✅ Activity generated successfully:', activity.title);
-        return activity;
 
     } catch (error) {
         console.error('❌ Error generating SEL/STEM activity:', error);

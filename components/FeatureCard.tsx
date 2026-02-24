@@ -1,13 +1,14 @@
 "use client";
 
 import React from 'react';
+import { Card, CardHeader, CardTitle, CardDescription, CardContent } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 
 interface FeatureCardProps {
     icon: string;
     title: string;
     description: string;
-    gradientFrom: string;
-    gradientTo: string;
     onClick: () => void;
     delay?: number;
 }
@@ -16,8 +17,6 @@ export default function FeatureCard({
     icon,
     title,
     description,
-    gradientFrom,
-    gradientTo,
     onClick,
     delay = 0
 }: FeatureCardProps) {
@@ -26,65 +25,46 @@ export default function FeatureCard({
             className="animate-fade-in stagger-item"
             style={{ animationDelay: `${delay}s` }}
         >
-            <div
+            <Card
                 onClick={onClick}
-                className={`
-                    relative group cursor-pointer
-                    bg-white rounded-2xl shadow-lg border-2 border-gray-200
-                    p-8 transition-all duration-300
-                    hover:shadow-2xl hover:-translate-y-2
-                    overflow-hidden
-                `}
+                className={cn(
+                    "relative group cursor-pointer bg-white",
+                    "border-2 border-gray-200 transition-all duration-300",
+                    "hover:shadow-lg hover:border-gray-300 hover:-translate-y-1"
+                )}
             >
-                {/* Gradient Background on Hover */}
-                <div className={`
-                    absolute inset-0 opacity-0 group-hover:opacity-10
-                    bg-gradient-to-br ${gradientFrom} ${gradientTo}
-                    transition-opacity duration-300
-                `} />
-
                 {/* Content */}
-                <div className="relative z-10">
-                    {/* Icon */}
-                    <div className="text-6xl mb-4 transform group-hover:scale-110 transition-transform duration-300">
-                        {icon}
+                <CardHeader>
+                    {/* Icon and Title on same line */}
+                    <div className="flex items-center gap-3 mb-3">
+                        <div className="text-4xl transform group-hover:scale-110 transition-transform duration-300">
+                            {icon}
+                        </div>
+                        <CardTitle className="text-xl text-gray-900">
+                            {title}
+                        </CardTitle>
                     </div>
 
-                    {/* Title */}
-                    <h3 className={`
-                        text-2xl font-bold mb-3
-                        bg-gradient-to-r ${gradientFrom} ${gradientTo}
-                        bg-clip-text text-transparent
-                    `}>
-                        {title}
-                    </h3>
-
                     {/* Description */}
-                    <p className="text-gray-600 mb-6 leading-relaxed">
+                    <CardDescription className="text-sm leading-relaxed mb-6 text-gray-600">
                         {description}
-                    </p>
+                    </CardDescription>
+                </CardHeader>
 
+                <CardContent>
                     {/* Launch Button */}
-                    <button className={`
-                        w-full px-6 py-3 rounded-lg font-semibold
-                        bg-gradient-to-r ${gradientFrom} ${gradientTo}
-                        text-white shadow-md
-                        transform group-hover:scale-105
-                        transition-all duration-300
-                        hover:shadow-lg
-                    `}>
+                    <Button
+                        className={cn(
+                            "w-full font-semibold",
+                            "bg-blue-500 text-white",
+                            "hover:bg-blue-600",
+                            "transition-all duration-300"
+                        )}
+                    >
                         Launch Tool →
-                    </button>
-                </div>
-
-                {/* Decorative Corner */}
-                <div className={`
-                    absolute -top-10 -right-10 w-32 h-32 rounded-full
-                    bg-gradient-to-br ${gradientFrom} ${gradientTo}
-                    opacity-10 group-hover:opacity-20
-                    transition-opacity duration-300
-                `} />
-            </div>
+                    </Button>
+                </CardContent>
+            </Card>
         </div>
     );
 }

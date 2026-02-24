@@ -37,20 +37,17 @@ export default function SubjectSelector({
                 disabled={disabled}
                 className={cn(
                     "w-full px-4 py-3 pr-10 rounded-lg font-medium text-base",
-                    "border-2 border-gray-300",
-                    "focus:outline-none focus:ring-2 focus:ring-secondary-500 focus:border-transparent",
-                    "hover:border-secondary-400 hover:shadow-md transition-all duration-200",
+                    "border-2 border-gray-300 bg-white text-gray-900",
+                    "focus:outline-none focus:ring-2 focus:ring-gray-400 focus:border-transparent",
+                    "hover:border-gray-400 hover:shadow-md transition-all duration-200",
                     "disabled:opacity-50 disabled:cursor-not-allowed",
-                    "cursor-pointer appearance-none",
-                    `bg-gradient-to-r ${currentSubject?.gradient || 'from-pink-50 to-purple-50'}`,
-                    currentSubject?.color || 'text-gray-700'
+                    "cursor-pointer appearance-none"
                 )}
             >
                 {SUBJECTS.map((subject) => (
                     <option
                         key={subject.value}
                         value={subject.value}
-                        className={subject.color}
                     >
                         {subject.label}
                     </option>
@@ -59,7 +56,7 @@ export default function SubjectSelector({
 
             {/* Custom Arrow */}
             <div className="absolute inset-y-0 right-0 flex items-center pr-3 pointer-events-none">
-                <svg className="w-5 h-5 text-secondary-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                 </svg>
             </div>

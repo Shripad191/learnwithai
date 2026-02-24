@@ -1,8 +1,6 @@
-import type { SummaryStructure, JsMindData, ClassLevel } from '@/types';
-
-// Storage key prefix
-const STORAGE_PREFIX = 'mindmap_';
-const SAVED_ITEMS_KEY = `${STORAGE_PREFIX}saved_items`;
+import type { SummaryStructure, JsMindData, ClassLevel, Quiz, LessonPlan, SELSTEMActivity, Board } from '@/types';
+import type { SavedSummary, SavedQuiz, SavedLesson, SavedActivity, SavedContentListItem } from '@/types/storage-types';
+import { saveContent, getAllContent, deleteContent, getContent } from './supabase-storage';
 
 export interface SavedMindMap {
     id: string;
@@ -16,34 +14,169 @@ export interface SavedMindMap {
 }
 
 /**
- * Get all saved mind maps from localStorage
+ * Get all saved mind maps from Supabase
  */
-export function getSavedMindMaps(): SavedMindMap[] {
-    if (typeof window === 'undefined') return [];
+export async function getSavedMindMaps(): Promise<SavedMindMap[]> {
+    const result = await getAllContent();
 
-    try {
-        const saved = localStorage.getItem(SAVED_ITEMS_KEY);
-        return saved ? JSON.parse(saved) : [];
-    } catch (error) {
-        console.error('Error loading saved mind maps:', error);
+    if (!result.success || !result.data) {
+        console.error('Failed to load saved content:', result.error);
         return [];
     }
+
+    // Filter only summary type and convert to old format for compatibility
+    const summaries = result.data.items.filter(item => item.type === 'summary');
+
+    // Fetch full data for each summary
+    const mindMaps: SavedMindMap[] = [];
+
+    for (const item of summaries) {
+        const contentResult = await getContent(item.key);
+
+        if (contentResult.success && contentResult.data) {
+            const content = contentResult.data.value as SavedSummary;
+
+            mindMaps.push({
+                id: item.key,
+                timestamp: item.metadata.timestamp,
+                chapterName: item.metadata.chapterName,
+                classLevel: item.metadata.classLevel,
+                subject: item.metadata.subject,
+                summary: content.data.summary,
+                mindMapData: content.data.mindMapData,
+                chapterText: content.data.chapterText,
+            });
+        }
+    }
+
+    return mindMaps;
 }
 
 /**
- * Save a mind map to localStorage
+ * Get all saved quizzes from Supabase
  */
-export function saveMindMap(
+export async function getSavedQuizzes(): Promise<Array<SavedQuiz & { id: string; timestamp: number }>> {
+    const result = await getAllContent();
+
+    if (!result.success || !result.data) {
+        console.error('Failed to load saved content:', result.error);
+        return [];
+    }
+
+    const quizzes = result.data.items.filter(item => item.type === 'quiz');
+    const quizData: Array<SavedQuiz & { id: string; timestamp: number }> = [];
+
+    for (const item of quizzes) {
+        const contentResult = await getContent(item.key);
+
+        if (contentResult.success && contentResult.data) {
+            const content = contentResult.data.value as SavedQuiz;
+            quizData.push({
+                ...content,
+                id: item.key,
+                timestamp: item.metadata.timestamp,
+            });
+        }
+    }
+
+    return quizData;
+}
+
+/**
+ * Get all saved lesson plans from Supabase
+ */
+export async function getSavedLessonPlans(): Promise<Array<SavedLesson & { id: string; timestamp: number }>> {
+    const result = await getAllContent();
+
+    if (!result.success || !result.data) {
+        console.error('Failed to load saved content:', result.error);
+        return [];
+    }
+
+    const lessons = result.data.items.filter(item => item.type === 'lesson');
+    const lessonData: Array<SavedLesson & { id: string; timestamp: number }> = [];
+
+    for (const item of lessons) {
+        const contentResult = await getContent(item.key);
+
+        if (contentResult.success && contentResult.data) {
+            const content = contentResult.data.value as SavedLesson;
+            lessonData.push({
+                ...content,
+                id: item.key,
+                timestamp: item.metadata.timestamp,
+            });
+        }
+    }
+
+    return lessonData;
+}
+
+/**
+ * Get all saved SEL/STEM activities from Supabase
+ */
+export async function getSavedActivities(): Promise<Array<SavedActivity & { id: string; timestamp: number }>> {
+    const result = await getAllContent();
+
+    if (!result.success || !result.data) {
+        console.error('Failed to load saved content:', result.error);
+        return [];
+    }
+
+    const activities = result.data.items.filter(item => item.type === 'activity');
+    const activityData: Array<SavedActivity & { id: string; timestamp: number }> = [];
+
+    for (const item of activities) {
+        const contentResult = await getContent(item.key);
+
+        if (contentResult.success && contentResult.data) {
+            const content = contentResult.data.value as SavedActivity;
+            activityData.push({
+                ...content,
+                id: item.key,
+                timestamp: item.metadata.timestamp,
+            });
+        }
+    }
+
+    return activityData;
+}
+
+/**
+ * Save a mind map to Supabase
+ */
+export async function saveMindMap(
     chapterName: string,
     classLevel: ClassLevel,
     summary: SummaryStructure,
     mindMapData: JsMindData,
     chapterText: string,
     subject?: string
-): SavedMindMap {
-    const savedItem: SavedMindMap = {
-        id: generateId(),
-        timestamp: Date.now(),
+): Promise<SavedMindMap> {
+    const content: SavedSummary = {
+        type: 'summary',
+        metadata: {
+            chapterName,
+            classLevel,
+            subject,
+            timestamp: Date.now(),
+        },
+        data: {
+            summary,
+            mindMapData,
+            chapterText,
+        },
+    };
+
+    const result = await saveContent(content);
+
+    if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Failed to save mind map');
+    }
+
+    return {
+        id: result.data.key,
+        timestamp: content.metadata.timestamp,
         chapterName,
         classLevel,
         subject,
@@ -51,34 +184,118 @@ export function saveMindMap(
         mindMapData,
         chapterText,
     };
+}
 
-    const items = getSavedMindMaps();
-    items.unshift(savedItem); // Add to beginning
+/**
+ * Save a quiz to Supabase
+ */
+export async function saveQuiz(
+    chapterName: string,
+    classLevel: ClassLevel,
+    quiz: Quiz,
+    subject?: string,
+    board?: Board
+): Promise<{ id: string; timestamp: number }> {
+    const content: SavedQuiz = {
+        type: 'quiz',
+        metadata: {
+            chapterName,
+            classLevel,
+            subject,
+            board,
+            timestamp: Date.now(),
+        },
+        data: {
+            quiz,
+        },
+    };
 
-    // Keep only last 50 items to avoid localStorage limits
-    const limitedItems = items.slice(0, 50);
+    const result = await saveContent(content);
 
-    try {
-        localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(limitedItems));
-        return savedItem;
-    } catch (error) {
-        console.error('Error saving mind map:', error);
-        throw new Error('Failed to save mind map. Storage might be full.');
+    if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Failed to save quiz');
     }
+
+    return {
+        id: result.data.key,
+        timestamp: content.metadata.timestamp,
+    };
+}
+
+/**
+ * Save a lesson plan to Supabase
+ */
+export async function saveLessonPlan(
+    lessonPlan: LessonPlan
+): Promise<{ id: string; timestamp: number }> {
+    const content: SavedLesson = {
+        type: 'lesson',
+        metadata: {
+            chapterName: lessonPlan.topic,
+            classLevel: lessonPlan.classLevel,
+            subject: lessonPlan.subject,
+            board: lessonPlan.board,
+            timestamp: Date.now(),
+        },
+        data: {
+            lessonPlan,
+        },
+    };
+
+    const result = await saveContent(content);
+
+    if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Failed to save lesson plan');
+    }
+
+    return {
+        id: result.data.key,
+        timestamp: content.metadata.timestamp,
+    };
+}
+
+/**
+ * Save a SEL/STEM activity to Supabase
+ */
+export async function saveSELSTEMActivity(
+    activity: SELSTEMActivity,
+    chapterName: string,
+    classLevel: ClassLevel,
+    subject: string
+): Promise<{ id: string; timestamp: number }> {
+    const content: SavedActivity = {
+        type: 'activity',
+        metadata: {
+            chapterName,
+            classLevel,
+            subject,
+            timestamp: Date.now(),
+        },
+        data: {
+            activity,
+        },
+    };
+
+    const result = await saveContent(content);
+
+    if (!result.success || !result.data) {
+        throw new Error(result.error?.message || 'Failed to save activity');
+    }
+
+    return {
+        id: result.data.key,
+        timestamp: content.metadata.timestamp,
+    };
 }
 
 /**
  * Delete a saved mind map
  */
-export function deleteSavedMindMap(id: string): void {
-    const items = getSavedMindMaps();
-    const filtered = items.filter(item => item.id !== id);
+export async function deleteSavedMindMap(key: string): Promise<void> {
+    const result = await deleteContent(key);
 
-    try {
-        localStorage.setItem(SAVED_ITEMS_KEY, JSON.stringify(filtered));
-    } catch (error) {
-        console.error('Error deleting mind map:', error);
-        throw new Error('Failed to delete mind map.');
+    if (!result.success) {
+        throw new Error(result.error?.message || 'Failed to delete mind map');
     }
 }
 
@@ -99,45 +316,6 @@ export function exportAsJSON(savedItem: SavedMindMap): void {
 }
 
 /**
- * Import a mind map from JSON file
- */
-export function importFromJSON(file: File): Promise<SavedMindMap> {
-    return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-
-        reader.onload = (e) => {
-            try {
-                const content = e.target?.result as string;
-                const data = JSON.parse(content) as SavedMindMap;
-
-                // Validate the data structure
-                if (!data.chapterName || !data.summary || !data.mindMapData) {
-                    throw new Error('Invalid mind map file format');
-                }
-
-                // Generate new ID and timestamp
-                data.id = generateId();
-                data.timestamp = Date.now();
-
-                resolve(data);
-            } catch (error) {
-                reject(new Error('Failed to parse JSON file'));
-            }
-        };
-
-        reader.onerror = () => reject(new Error('Failed to read file'));
-        reader.readAsText(file);
-    });
-}
-
-/**
- * Generate a unique ID
- */
-function generateId(): string {
-    return `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-}
-
-/**
  * Format timestamp for display
  */
 export function formatTimestamp(timestamp: number): string {
@@ -154,25 +332,4 @@ export function formatTimestamp(timestamp: number): string {
     if (diffDays < 7) return `${diffDays} day${diffDays > 1 ? 's' : ''} ago`;
 
     return date.toLocaleDateString();
-}
-
-/**
- * Get storage usage info
- */
-export function getStorageInfo(): { used: number; total: number; percentage: number } {
-    if (typeof window === 'undefined') {
-        return { used: 0, total: 0, percentage: 0 };
-    }
-
-    try {
-        const items = getSavedMindMaps();
-        const dataStr = JSON.stringify(items);
-        const used = new Blob([dataStr]).size;
-        const total = 5 * 1024 * 1024; // Approximate 5MB localStorage limit
-        const percentage = (used / total) * 100;
-
-        return { used, total, percentage };
-    } catch (error) {
-        return { used: 0, total: 0, percentage: 0 };
-    }
 }

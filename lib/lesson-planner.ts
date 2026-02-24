@@ -1,5 +1,6 @@
 import type { ClassLevel, Board, LessonPlan, Lecture } from '@/types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callOpenRouter, isOpenRouterConfigured } from './openrouter';
 
 /**
  * Get Gemini client with API key
@@ -180,57 +181,126 @@ CRITICAL: The "totalLectures" field MUST equal ${desiredLectures}, and you MUST 
 Generate the complete multi-lecture Teach Pack now!`;
 
     console.log('📡 Sending request to Gemini API...');
-    const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-    const result = await model.generateContent(prompt);
-    console.log('✅ Received response from Gemini API');
-    const response = result.response.text();
-    console.log('📝 Response text length:', response.length);
 
-    // Extract JSON from response
-    let jsonText = response.trim();
-    if (jsonText.startsWith('```json')) {
-      jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-    } else if (jsonText.startsWith('```')) {
-      jsonText = jsonText.replace(/```\n?/g, '');
-    }
+    try {
+      const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+      const result = await model.generateContent(prompt);
+      console.log('✅ Received response from Gemini API');
+      const response = result.response.text();
+      console.log('📝 Response text length:', response.length);
 
-    const parsed = JSON.parse(jsonText);
+      // Extract JSON from response
+      let jsonText = response.trim();
+      if (jsonText.startsWith('```json')) {
+        jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+      } else if (jsonText.startsWith('```')) {
+        jsonText = jsonText.replace(/```\n?/g, '');
+      }
 
-    const lessonPlan: LessonPlan = {
-      id: `lesson_${Date.now()}`,
-      board,
-      classLevel,
-      subject,
-      topic,
-      totalMinutes,
-      totalLectures: parsed.totalLectures || parsed.lectures.length,
-      lectures: parsed.lectures.map((lecture: any) => ({
-        lectureNumber: lecture.lectureNumber,
-        title: lecture.title,
-        duration: lecture.duration,
-        topics: lecture.topics || [],
-        complexity: lecture.complexity || 'moderate',
-        hasRecap: lecture.hasRecap || false,
-        recapContent: lecture.recapContent || '',
-        isActivityLecture: lecture.isActivityLecture || false,
-        teachPackCards: {
-          todaysPlan: lecture.teachPackCards.todaysPlan || '',
-          start: lecture.teachPackCards.start || '',
-          explain: lecture.teachPackCards.explain || '',
-          do: lecture.teachPackCards.do || '',
-          talk: lecture.teachPackCards.talk || '',
-          check: lecture.teachPackCards.check || ''
+      const parsed = JSON.parse(jsonText);
+
+      const lessonPlan: LessonPlan = {
+        id: `lesson_${Date.now()}`,
+        board,
+        classLevel,
+        subject,
+        topic,
+        totalMinutes,
+        totalLectures: parsed.totalLectures || parsed.lectures.length,
+        lectures: parsed.lectures.map((lecture: any) => ({
+          lectureNumber: lecture.lectureNumber,
+          title: lecture.title,
+          duration: lecture.duration,
+          topics: lecture.topics || [],
+          complexity: lecture.complexity || 'moderate',
+          hasRecap: lecture.hasRecap || false,
+          recapContent: lecture.recapContent || '',
+          isActivityLecture: lecture.isActivityLecture || false,
+          teachPackCards: {
+            todaysPlan: lecture.teachPackCards.todaysPlan || '',
+            start: lecture.teachPackCards.start || '',
+            explain: lecture.teachPackCards.explain || '',
+            do: lecture.teachPackCards.do || '',
+            talk: lecture.teachPackCards.talk || '',
+            check: lecture.teachPackCards.check || ''
+          }
+        })),
+        homework: parsed.homework || '',
+        parentMessage: parsed.parentMessage || '',
+        teachingPace: teachingStyle,
+        generatedAt: Date.now(),
+        customized: false,
+        language
+      };
+
+      console.log("✅ Lesson plan generated via Gemini");
+      return lessonPlan;
+    } catch (geminiError) {
+      console.warn("Gemini lesson plan generation failed, trying OpenRouter fallback:", geminiError);
+
+      if (!isOpenRouterConfigured()) {
+        throw geminiError;
+      }
+
+      try {
+        console.log('📡 Sending request to OpenRouter API...');
+        const response = await callOpenRouter(prompt);
+        console.log('✅ Received response from OpenRouter API');
+        console.log('📝 Response text length:', response.length);
+
+        // Extract JSON from response
+        let jsonText = response.trim();
+        if (jsonText.startsWith('```json')) {
+          jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+        } else if (jsonText.startsWith('```')) {
+          jsonText = jsonText.replace(/```\n?/g, '');
         }
-      })),
-      homework: parsed.homework || '',
-      parentMessage: parsed.parentMessage || '',
-      teachingPace: teachingStyle,
-      generatedAt: Date.now(),
-      customized: false,
-      language
-    };
 
-    return lessonPlan;
+        const parsed = JSON.parse(jsonText);
+
+        const lessonPlan: LessonPlan = {
+          id: `lesson_${Date.now()}`,
+          board,
+          classLevel,
+          subject,
+          topic,
+          totalMinutes,
+          totalLectures: parsed.totalLectures || parsed.lectures.length,
+          lectures: parsed.lectures.map((lecture: any) => ({
+            lectureNumber: lecture.lectureNumber,
+            title: lecture.title,
+            duration: lecture.duration,
+            topics: lecture.topics || [],
+            complexity: lecture.complexity || 'moderate',
+            hasRecap: lecture.hasRecap || false,
+            recapContent: lecture.recapContent || '',
+            isActivityLecture: lecture.isActivityLecture || false,
+            teachPackCards: {
+              todaysPlan: lecture.teachPackCards.todaysPlan || '',
+              start: lecture.teachPackCards.start || '',
+              explain: lecture.teachPackCards.explain || '',
+              do: lecture.teachPackCards.do || '',
+              talk: lecture.teachPackCards.talk || '',
+              check: lecture.teachPackCards.check || ''
+            }
+          })),
+          homework: parsed.homework || '',
+          parentMessage: parsed.parentMessage || '',
+          teachingPace: teachingStyle,
+          generatedAt: Date.now(),
+          customized: false,
+          language
+        };
+
+        console.log("✅ Lesson plan generated via OpenRouter");
+        return lessonPlan;
+      } catch (fallbackError) {
+        console.error("Both Gemini and OpenRouter failed for lesson plan generation");
+        throw new Error(
+          `Failed to generate lesson plan with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+        );
+      }
+    }
   } catch (error) {
     console.error('Lesson plan generation error:', error);
     throw new Error(

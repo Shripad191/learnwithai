@@ -1,5 +1,6 @@
 import type { SummaryStructure, ClassLevel, Quiz, QuizQuestion } from '@/types';
 import { GoogleGenerativeAI } from '@google/generative-ai';
+import { callOpenRouter, isOpenRouterConfigured } from './openrouter';
 
 /**
  * Get Gemini client with API key
@@ -145,29 +146,68 @@ ${summaryJson}
 Generate exactly ${counts.mcq + counts.trueFalse + counts.shortAnswer} questions following the format above.
 🚨 CRITICAL: ALL questions, options, and explanations MUST be in ${language.toUpperCase()}!`;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const response = result.response.text();
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+            const result = await model.generateContent(prompt);
+            const response = result.response.text();
 
-        // Extract JSON from response
-        let jsonText = response.trim();
-        if (jsonText.startsWith('```json')) {
-            jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-        } else if (jsonText.startsWith('```')) {
-            jsonText = jsonText.replace(/```\n?/g, '');
+            // Extract JSON from response
+            let jsonText = response.trim();
+            if (jsonText.startsWith('```json')) {
+                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            } else if (jsonText.startsWith('```')) {
+                jsonText = jsonText.replace(/```\n?/g, '');
+            }
+
+            const parsed = JSON.parse(jsonText);
+
+            const quiz: Quiz = {
+                id: `quiz_${Date.now()}`,
+                chapterName: summary.chapterName,
+                classLevel: summary.classLevel,
+                questions: parsed.questions,
+                generatedAt: Date.now()
+            };
+
+            console.log("✅ Quiz generated via Gemini");
+            return quiz;
+        } catch (geminiError) {
+            console.warn("Gemini quiz generation failed, trying OpenRouter fallback:", geminiError);
+
+            if (!isOpenRouterConfigured()) {
+                throw geminiError;
+            }
+
+            try {
+                const response = await callOpenRouter(prompt);
+
+                // Extract JSON from response
+                let jsonText = response.trim();
+                if (jsonText.startsWith('```json')) {
+                    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                } else if (jsonText.startsWith('```')) {
+                    jsonText = jsonText.replace(/```\n?/g, '');
+                }
+
+                const parsed = JSON.parse(jsonText);
+
+                const quiz: Quiz = {
+                    id: `quiz_${Date.now()}`,
+                    chapterName: summary.chapterName,
+                    classLevel: summary.classLevel,
+                    questions: parsed.questions,
+                    generatedAt: Date.now()
+                };
+
+                console.log("✅ Quiz generated via OpenRouter");
+                return quiz;
+            } catch (fallbackError) {
+                console.error("Both Gemini and OpenRouter failed for quiz generation");
+                throw new Error(
+                    `Failed to generate quiz with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+                );
+            }
         }
-
-        const parsed = JSON.parse(jsonText);
-
-        const quiz: Quiz = {
-            id: `quiz_${Date.now()}`,
-            chapterName: summary.chapterName,
-            classLevel: summary.classLevel,
-            questions: parsed.questions,
-            generatedAt: Date.now()
-        };
-
-        return quiz;
     } catch (error) {
         console.error('Quiz generation error:', error);
         throw new Error(
@@ -338,29 +378,68 @@ OUTPUT FORMAT (STRICT JSON):
 Generate exactly ${counts.mcq + counts.trueFalse + counts.shortAnswer} questions following the format above.
 🚨 CRITICAL: ALL questions, options, and explanations MUST be in ${language.toUpperCase()}!`;
 
-        const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
-        const result = await model.generateContent(prompt);
-        const response = result.response.text();
+        try {
+            const model = genAI.getGenerativeModel({ model: "gemini-2.5-flash-lite" });
+            const result = await model.generateContent(prompt);
+            const response = result.response.text();
 
-        // Extract JSON from response
-        let jsonText = response.trim();
-        if (jsonText.startsWith('```json')) {
-            jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
-        } else if (jsonText.startsWith('```')) {
-            jsonText = jsonText.replace(/```\n?/g, '');
+            // Extract JSON from response
+            let jsonText = response.trim();
+            if (jsonText.startsWith('```json')) {
+                jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+            } else if (jsonText.startsWith('```')) {
+                jsonText = jsonText.replace(/```\n?/g, '');
+            }
+
+            const parsed = JSON.parse(jsonText);
+
+            const quiz: Quiz = {
+                id: `quiz_${Date.now()}`,
+                chapterName: chapterName,
+                classLevel: classLevel,
+                questions: parsed.questions,
+                generatedAt: Date.now()
+            };
+
+            console.log("✅ Quiz from chapter generated via Gemini");
+            return quiz;
+        } catch (geminiError) {
+            console.warn("Gemini quiz from chapter generation failed, trying OpenRouter fallback:", geminiError);
+
+            if (!isOpenRouterConfigured()) {
+                throw geminiError;
+            }
+
+            try {
+                const response = await callOpenRouter(prompt);
+
+                // Extract JSON from response
+                let jsonText = response.trim();
+                if (jsonText.startsWith('```json')) {
+                    jsonText = jsonText.replace(/```json\n?/g, '').replace(/```\n?/g, '');
+                } else if (jsonText.startsWith('```')) {
+                    jsonText = jsonText.replace(/```\n?/g, '');
+                }
+
+                const parsed = JSON.parse(jsonText);
+
+                const quiz: Quiz = {
+                    id: `quiz_${Date.now()}`,
+                    chapterName: chapterName,
+                    classLevel: classLevel,
+                    questions: parsed.questions,
+                    generatedAt: Date.now()
+                };
+
+                console.log("✅ Quiz from chapter generated via OpenRouter");
+                return quiz;
+            } catch (fallbackError) {
+                console.error("Both Gemini and OpenRouter failed for quiz from chapter generation");
+                throw new Error(
+                    `Failed to generate quiz from chapter with both APIs. Gemini error: ${geminiError instanceof Error ? geminiError.message : 'Unknown'}. OpenRouter error: ${fallbackError instanceof Error ? fallbackError.message : 'Unknown'}`
+                );
+            }
         }
-
-        const parsed = JSON.parse(jsonText);
-
-        const quiz: Quiz = {
-            id: `quiz_${Date.now()}`,
-            chapterName: chapterName,
-            classLevel: classLevel,
-            questions: parsed.questions,
-            generatedAt: Date.now()
-        };
-
-        return quiz;
     } catch (error) {
         console.error('Quiz generation error:', error);
         throw new Error(
